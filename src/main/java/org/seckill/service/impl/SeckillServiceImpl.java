@@ -52,6 +52,10 @@ public class SeckillServiceImpl implements SeckillService{
 	@Override
 	public Exposer exportSeckillUrl(long seckillId) {
 		// TODO Auto-generated method stub
+		//优化点 缓存优化
+		/*
+		 * 
+		 */
 		
 		Seckill seckill = seckillDao.queryById(seckillId);
 		if(seckill == null) {
