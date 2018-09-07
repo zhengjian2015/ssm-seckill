@@ -1,12 +1,16 @@
 package org.seckill.service.impl;
 
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Resource;
 
+import org.apache.commons.collections.MapUtils;
 import org.seckill.dao.SeckillDao;
 import org.seckill.dao.SuccessKillDao;
+import org.seckill.dao.cache.RedisDao;
 import org.seckill.dto.Exposer;
 import org.seckill.dto.SeckillExecution;
 import org.seckill.entity.Seckill;
@@ -18,6 +22,7 @@ import org.seckill.exception.SeckillException;
 import org.seckill.service.SeckillService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
@@ -28,7 +33,10 @@ public class SeckillServiceImpl implements SeckillService{
 
 	private Logger logger = LoggerFactory.getLogger(SeckillServiceImpl.class);
 	
-	private final String salt="saaa2333(((9cxx";
+	private final String salt = "saaa2333(((9cxx";
+	
+	@Autowired
+	private RedisDao redisDao;
 	
 	//注入service依赖
 	@Resource
@@ -56,11 +64,19 @@ public class SeckillServiceImpl implements SeckillService{
 		/*
 		 * 
 		 */
-		
-		Seckill seckill = seckillDao.queryById(seckillId);
+		//访问redis
+		Seckill seckill = redisDao.getSeckill(seckillId);
 		if(seckill == null) {
-			return new Exposer(false,seckillId);
+			seckill = seckillDao.queryById(seckillId);
+			if(seckill == null) {
+				return new Exposer(false,seckillId);
+			} else {
+				//放入redis缓存
+				redisDao.putSeckill(seckill);
+			}
 		}
+		
+		
 		Date startTime = seckill.getStartTime();
 		Date endTime = seckill.getEndTime();
 		//系统当前时间
@@ -74,7 +90,7 @@ public class SeckillServiceImpl implements SeckillService{
 	}
 
 	private String getMd5(long seckillId) {
-		String base = seckillId +"/"+salt;
+		String base = seckillId + "/" + salt;
 		String md5 = DigestUtils.md5DigestAsHex(base.getBytes());
 		return md5;
 	}
@@ -96,21 +112,23 @@ public class SeckillServiceImpl implements SeckillService{
 		//执行秒杀逻辑
 		Date nowTime = new Date();
 		try {
-			int updateCoint = seckillDao.reduceNumber(seckillId, nowTime);
-			if(updateCoint <= 0) {
-				//没有更新库存
-				throw new SeckillCloseException("Seckill close");
+			//记录购买行为
+			int inserCount = successKillDao.insertSuccesskilled(seckillId, userPhone);
+			if(inserCount <= 0) {
+				throw new RepeatKillException("seckill repeat");
 			} else {
-				//记录购买行为
-				int inserCount = successKillDao.insertSuccesskilled(seckillId, userPhone);
-				if(inserCount <= 0) {
-					throw new RepeatKillException("seckill repeat");
+				int updateCoint = seckillDao.reduceNumber(seckillId, nowTime);
+				if(updateCoint <= 0) {
+					//没有更新库存 rollback
+					throw new SeckillCloseException("Seckill close");
 				} else {
-					//秒杀成功
+					//秒杀成功 commit
 					SuccessKilled successKilled = successKillDao.queryByIdWithSeckill(seckillId, userPhone);
 					return new SeckillExecution(seckillId, SeckillStatEnum.SUCCESS, successKilled);
 				}
+				
 			}
+			
 		} 
 		catch (SeckillCloseException e1){
 			throw e1;
@@ -126,5 +144,31 @@ public class SeckillServiceImpl implements SeckillService{
 	}
 	
 	
-	
+	public SeckillExecution executeSeckillProcedure(long seckillId, long userPhone, String md5) {
+		if (md5 == null || !md5.equals(getMd5(seckillId))) {
+			return new SeckillExecution(seckillId, SeckillStatEnum.DATA_REWRITE);
+		}
+		Date killTime = new Date();
+		Map<String, Object> map = new HashMap<String, Object>();
+		map.put("seckillId", seckillId);
+		map.put("phone", userPhone);
+		map.put("killTime", killTime);
+		map.put("result", null);
+		try {
+			seckillDao.killByProcedure(map);
+			// 获取result
+			int result = MapUtils.getInteger(map, "result", -2);
+			if (result == 1) {
+				SuccessKilled sk = successKillDao.queryByIdWithSeckill(seckillId, userPhone);
+				return new SeckillExecution(seckillId, SeckillStatEnum.SUCCESS, sk);
+			} else {
+				return new SeckillExecution(seckillId, SeckillStatEnum.stateOf(result));
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			logger.error(e.getMessage(), e);
+			return new SeckillExecution(seckillId, SeckillStatEnum.INNER_ERROR);
+		}
+
+	}
 }
