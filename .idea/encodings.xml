@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/dao/SeckillDao.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/dao/SuccessKillDao.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/dto/Exposer.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/entity/SuccessKilled.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/enums/SeckillStatEnum.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/exception/RepeatKillException.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/exception/SeckillException.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/service/SeckillService.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/service/impl/SeckillServiceImpl.java" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/src/main/java/org/seckill/web/SeckillController.java" charset="GBK" />
+  </component>
+</project>
